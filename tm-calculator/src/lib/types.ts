@@ -1,4 +1,4 @@
-export type CardType = "event" | "automated" | "active";
+export type CardType = "event" | "automated" | "active" | "prelude";
 export type Tag = "building" | "space" | "power" | "science" | "plant" | "microbe" | "animal" | "city" | "earth" | "jovian" | "venus" | "wild";
 export type ResourceType = "megacredits" | "steel" | "titanium" | "plants" | "energy" | "heat";
 export type Expansion = "base" | "corporate_era" | "prelude" | "venus" | "colonies" | "turmoil";
