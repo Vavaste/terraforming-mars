@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from "react";
 import { ALL_CARDS } from "@/lib/cards-data";
 import { evaluateCard } from "@/lib/valuation";
 import { GameSettings, DEFAULT_GAME_SETTINGS, TerraformingMarsCard, CardValuation } from "@/lib/types";
+import { useLocalStorage } from "@/lib/useLocalStorage";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,6 +13,7 @@ import { CardDetail } from "@/components/CardDetail";
 import { CardValueBadge } from "@/components/CardValueBadge";
 import { TagBadge } from "@/components/TagBadge";
 import { CardTypeIcon } from "@/components/CardTypeIcon";
+import { NavBar } from "@/components/NavBar";
 
 type SortBy = "name" | "cost" | "value" | "rating";
 type FilterType = "all" | "event" | "automated" | "active";
@@ -19,7 +21,7 @@ type FilterType = "all" | "event" | "automated" | "active";
 const ALL_TAGS = ["building", "space", "power", "science", "plant", "microbe", "animal", "city", "earth", "jovian"] as const;
 
 export default function Home() {
-  const [settings, setSettings] = useState<GameSettings>(DEFAULT_GAME_SETTINGS);
+  const [settings, setSettings] = useLocalStorage<GameSettings>("tm-settings", DEFAULT_GAME_SETTINGS);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [filterTags, setFilterTags] = useState<Set<string>>(new Set());
@@ -115,29 +117,23 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
-      {/* Header */}
-      <header className="border-b border-amber-800/30 bg-gradient-to-r from-amber-950/50 to-red-950/30">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <h1 className="text-3xl font-bold text-amber-400">
-            TM Calculator
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Calcola il valore reale delle carte di Terraforming Mars
-          </p>
-          <div className="flex gap-4 mt-3 text-sm">
-            <span className="text-muted-foreground">
-              {stats.total} carte | Media: <span className="text-amber-400 font-mono">{stats.avgValue} MC</span>
-            </span>
-            <div className="flex gap-2">
-              {Object.entries(stats.ratings).map(([rating, count]) => (
-                <span key={rating} className="text-muted-foreground">
-                  {rating}: <span className="text-foreground">{count}</span>
-                </span>
-              ))}
-            </div>
+      <NavBar />
+
+      {/* Stats bar */}
+      <div className="border-b border-border bg-card/50">
+        <div className="max-w-7xl mx-auto px-4 py-2 flex gap-4 text-sm">
+          <span className="text-muted-foreground">
+            {stats.total} carte | Media: <span className="text-amber-400 font-mono">{stats.avgValue} MC</span>
+          </span>
+          <div className="flex gap-2">
+            {Object.entries(stats.ratings).map(([rating, count]) => (
+              <span key={rating} className="text-muted-foreground">
+                {rating}: <span className="text-foreground">{count}</span>
+              </span>
+            ))}
           </div>
         </div>
-      </header>
+      </div>
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
