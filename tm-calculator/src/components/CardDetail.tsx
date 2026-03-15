@@ -1,18 +1,23 @@
 "use client";
 
-import { CardValuation } from "@/lib/types";
+import { CardValuation, GameSettings } from "@/lib/types";
+import { generateCardExplanation } from "@/lib/card-explanation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TagBadge } from "./TagBadge";
 import { CardTypeIcon } from "./CardTypeIcon";
 import { CardValueBadge } from "./CardValueBadge";
+import { useState } from "react";
 
 interface CardDetailProps {
   valuation: CardValuation;
+  settings: GameSettings;
 }
 
-export function CardDetail({ valuation }: CardDetailProps) {
+export function CardDetail({ valuation, settings }: CardDetailProps) {
   const { card, breakdown, breakevenGeneration } = valuation;
   const prod = card.effects.production;
+  const [showExplanation, setShowExplanation] = useState(true);
+  const explanation = generateCardExplanation(valuation, settings);
 
   return (
     <Card className="border-amber-800/50">
@@ -23,6 +28,11 @@ export function CardDetail({ valuation }: CardDetailProps) {
             <div className="flex items-center gap-2 mt-2">
               <CardTypeIcon type={card.type} />
               <span className="text-amber-400 font-mono font-bold">{card.cost} MC</span>
+              {card.expansion !== "base" && (
+                <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded">
+                  {card.expansion === "prelude" ? "Preludio" : card.expansion === "colonies" ? "Colonie" : card.expansion}
+                </span>
+              )}
             </div>
           </div>
           <CardValueBadge rating={valuation.rating} netValue={valuation.netValue} />
@@ -108,6 +118,39 @@ export function CardDetail({ valuation }: CardDetailProps) {
           {breakevenGeneration !== null && (
             <div className="mt-2 text-sm text-muted-foreground">
               Pareggio dopo <span className="text-amber-400 font-bold">{breakevenGeneration}</span> generazion{breakevenGeneration === 1 ? "e" : "i"}
+            </div>
+          )}
+        </div>
+
+        {/* Explanation Section */}
+        <div className="border-t border-border pt-3">
+          <button
+            onClick={() => setShowExplanation(!showExplanation)}
+            className="text-sm font-semibold text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1"
+          >
+            {showExplanation ? "\u25BC" : "\u25B6"} Spiegazione dettagliata
+          </button>
+          {showExplanation && (
+            <div className="mt-3 space-y-1.5 text-xs text-muted-foreground bg-secondary/30 rounded-lg p-3">
+              {explanation.map((line, i) => {
+                if (line === "") return <div key={i} className="h-2" />;
+                if (line.startsWith("Verdetto:")) {
+                  const isGood = valuation.netValue >= 3;
+                  const isBad = valuation.netValue < -3;
+                  return (
+                    <p key={i} className={`font-semibold text-sm ${isGood ? "text-green-400" : isBad ? "text-red-400" : "text-yellow-400"}`}>
+                      {line}
+                    </p>
+                  );
+                }
+                if (line.startsWith("Attenzione:")) {
+                  return <p key={i} className="text-red-400 font-medium">{line}</p>;
+                }
+                if (line.startsWith("  ")) {
+                  return <p key={i} className="pl-3 text-foreground/70">{line}</p>;
+                }
+                return <p key={i} className="text-foreground/80">{line}</p>;
+              })}
             </div>
           )}
         </div>

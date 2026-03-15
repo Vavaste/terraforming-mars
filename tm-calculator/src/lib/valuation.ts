@@ -106,7 +106,10 @@ function calcImmediateResourceValue(
 }
 
 /**
- * Calculate TR value (1VP at end + MC income per remaining gen)
+ * Calculate TR value for EXPLICIT TR gains (1VP at end + MC income per remaining gen).
+ * NOTE: TR from temperature/oxygen/ocean changes is already counted in calcGlobalParameterValue.
+ * The card.effects.tr field should only contain ADDITIONAL TR beyond what global parameter
+ * changes provide (e.g., Nitrogen-Rich Asteroid gives +2 TR in addition to its temp step).
  */
 function calcTRValue(
   card: TerraformingMarsCard,

@@ -16,7 +16,7 @@ import { CardTypeIcon } from "@/components/CardTypeIcon";
 import { NavBar } from "@/components/NavBar";
 
 type SortBy = "name" | "cost" | "value" | "rating";
-type FilterType = "all" | "event" | "automated" | "active";
+type FilterType = "all" | "event" | "automated" | "active" | "prelude";
 
 const ALL_TAGS = ["building", "space", "power", "science", "plant", "microbe", "animal", "city", "earth", "jovian"] as const;
 
@@ -24,6 +24,7 @@ export default function Home() {
   const [settings, setSettings] = useLocalStorage<GameSettings>("tm-settings", DEFAULT_GAME_SETTINGS);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
+  const [filterExpansion, setFilterExpansion] = useState<string>("all");
   const [filterTags, setFilterTags] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<SortBy>("value");
   const [sortAsc, setSortAsc] = useState(false);
@@ -48,6 +49,11 @@ export default function Home() {
     // Type filter
     if (filterType !== "all") {
       result = result.filter((v) => v.card.type === filterType);
+    }
+
+    // Expansion filter
+    if (filterExpansion !== "all") {
+      result = result.filter((v) => v.card.expansion === filterExpansion);
     }
 
     // Tag filter
@@ -80,7 +86,7 @@ export default function Home() {
     });
 
     return result;
-  }, [valuations, search, filterType, filterTags, sortBy, sortAsc]);
+  }, [valuations, search, filterType, filterExpansion, filterTags, sortBy, sortAsc]);
 
   const selectedValuation = useMemo(() => {
     if (!selectedCard) return null;
@@ -187,14 +193,33 @@ export default function Home() {
               />
 
               <div className="flex gap-2 flex-wrap">
-                {(["all", "event", "automated", "active"] as const).map((type) => (
+                {(["all", "event", "automated", "active", "prelude"] as const).map((type) => (
                   <Button
                     key={type}
                     variant={filterType === type ? "default" : "outline"}
                     size="sm"
                     onClick={() => setFilterType(type)}
                   >
-                    {type === "all" ? "Tutte" : type === "event" ? "Eventi" : type === "automated" ? "Automatiche" : "Attive"}
+                    {type === "all" ? "Tutte" : type === "event" ? "Eventi" : type === "automated" ? "Automatiche" : type === "active" ? "Attive" : "Preludi"}
+                  </Button>
+                ))}
+              </div>
+
+              <div className="flex gap-2 flex-wrap">
+                {([
+                  ["all", "Tutte"],
+                  ["base", "Base"],
+                  ["prelude", "Preludio"],
+                  ["colonies", "Colonie"],
+                ] as const).map(([exp, label]) => (
+                  <Button
+                    key={exp}
+                    variant={filterExpansion === exp ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setFilterExpansion(exp)}
+                    className="text-xs h-7"
+                  >
+                    {label}
                   </Button>
                 ))}
               </div>
@@ -255,7 +280,7 @@ export default function Home() {
           <div className="lg:col-span-4">
             <div className="sticky top-6">
               {selectedValuation ? (
-                <CardDetail valuation={selectedValuation} />
+                <CardDetail valuation={selectedValuation} settings={settings} />
               ) : (
                 <Card className="border-amber-800/50">
                   <CardContent className="py-12 text-center text-muted-foreground">
