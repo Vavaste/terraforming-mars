@@ -82,6 +82,7 @@ export interface CardValuation {
     globalParameterValue: number;
     cardDiscountValue: number;
     tagValue: number;
+    requirementPenalty: number;
   };
   breakevenGeneration: number | null;
 }

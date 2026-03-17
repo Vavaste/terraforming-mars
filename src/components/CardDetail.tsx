@@ -99,6 +99,14 @@ export function CardDetail({ valuation, settings }: CardDetailProps) {
             <BreakdownRow label="Parametri globali" value={breakdown.globalParameterValue} />
             <BreakdownRow label="Sconto carte" value={breakdown.cardDiscountValue} />
             <BreakdownRow label="Sinergia tag" value={breakdown.tagValue} />
+            {breakdown.requirementPenalty !== 0 && (
+              <>
+                <span className="text-muted-foreground">Penalita requisiti</span>
+                <span className="text-right font-mono text-red-400">
+                  -{breakdown.requirementPenalty}
+                </span>
+              </>
+            )}
           </div>
           <div className="flex justify-between mt-3 pt-2 border-t border-border font-semibold">
             <span>Valore totale</span>

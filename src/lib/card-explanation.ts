@@ -140,6 +140,49 @@ export function generateCardExplanation(valuation: CardValuation, settings: Game
     );
   }
 
+  // --- REQUIREMENT PENALTY ---
+  if (breakdown.requirementPenalty !== 0 && card.requirements) {
+    const req = card.requirements;
+    const penaltyParts: string[] = [];
+    if (req.minOceans !== undefined && req.minOceans > 0) {
+      penaltyParts.push(`min ${req.minOceans} oceani (-${req.minOceans * 2} MC base)`);
+    }
+    if (req.minTemperature !== undefined) {
+      const steps = (req.minTemperature - (-30)) / 2;
+      if (steps > 0) {
+        penaltyParts.push(`temp >= ${req.minTemperature}°C (-${(steps * 1.2).toFixed(1)} MC base)`);
+      }
+    }
+    if (req.minOxygen !== undefined && req.minOxygen > 0) {
+      penaltyParts.push(`O2 >= ${req.minOxygen}% (-${(req.minOxygen * 1.5).toFixed(1)} MC base)`);
+    }
+    if (req.maxTemperature !== undefined) {
+      penaltyParts.push(`temp <= ${req.maxTemperature}°C (finestra limitata)`);
+    }
+    if (req.maxOxygen !== undefined) {
+      penaltyParts.push(`O2 <= ${req.maxOxygen}% (finestra limitata)`);
+    }
+    if (req.maxOceans !== undefined) {
+      penaltyParts.push(`oceani <= ${req.maxOceans} (finestra limitata)`);
+    }
+    if (req.tag) {
+      penaltyParts.push(`richiede ${req.tag.count}x tag ${req.tag.tag} (-${req.tag.count * 3} MC)`);
+    }
+    if (req.minProduction) {
+      for (const [res, amount] of Object.entries(req.minProduction)) {
+        if (amount !== undefined && amount > 0) {
+          const resName = resourceNames[res] || res;
+          penaltyParts.push(`prod. ${resName} >= ${amount} (-${amount * 3} MC)`);
+        }
+      }
+    }
+    lines.push(`Penalita requisiti: -${breakdown.requirementPenalty} MC. Questa carta ha vincoli che ne limitano la giocabilita:`);
+    for (const p of penaltyParts) {
+      lines.push(`  ${p}`);
+    }
+    lines.push(`  La penalita e ${settings.generationsRemaining >= settings.totalGenerations * 0.6 ? "piena (inizio partita, piu incertezza)" : "ridotta (fine partita, sai gia se puoi giocarla)"}.`);
+  }
+
   // --- BREAKEVEN ---
   if (breakevenGeneration !== null) {
     if (breakevenGeneration <= settings.generationsRemaining) {
