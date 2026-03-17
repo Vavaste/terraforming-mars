@@ -210,6 +210,106 @@ function calcTagValue(card: TerraformingMarsCard): number {
 }
 
 /**
+ * Calculate a penalty for cards with play requirements.
+ *
+ * Requirements reduce a card's practical value because:
+ * 1. You may not be able to play the card when drawn (timing risk)
+ * 2. You lose flexibility - the card is dead in hand until conditions are met
+ * 3. Stricter requirements = higher chance the card is never playable
+ *
+ * Penalty scale (in MC):
+ * - Global parameter minimums: scaled by how restrictive the threshold is
+ *   Ocean: 0-9 scale, each ocean ~2 MC penalty (6 oceans = -12 MC)
+ *   Temperature: -30 to +8, each 2°C step ~1.5 MC penalty
+ *   Oxygen: 0-14%, each % ~1.5 MC penalty
+ * - Global parameter maximums: steeper penalty (window closes fast)
+ * - Tag requirements: -3 MC per required tag (need specific strategy)
+ * - Production requirements: -3 MC per production requirement
+ */
+function calcRequirementPenalty(
+  card: TerraformingMarsCard,
+  settings: GameSettings
+): number {
+  const req = card.requirements;
+  if (!req) return 0;
+
+  let penalty = 0;
+
+  // --- MIN requirements on global parameters ---
+  // The higher the minimum, the later you can play it = bigger penalty
+
+  if (req.minOceans !== undefined && req.minOceans > 0) {
+    // 9 oceans total. Each ocean required = ~2 MC penalty
+    // Scale: 1-2 oceans = mild, 3-4 = moderate, 5+ = severe
+    penalty += req.minOceans * 2;
+  }
+
+  if (req.minTemperature !== undefined) {
+    // Temperature ranges from -30°C to +8°C in 2°C steps (19 steps)
+    // Convert to steps from minimum: (-30 is step 0, +8 is step 19)
+    const tempStepsFromMin = (req.minTemperature - (-30)) / 2;
+    if (tempStepsFromMin > 0) {
+      penalty += tempStepsFromMin * 1.2;
+    }
+  }
+
+  if (req.minOxygen !== undefined && req.minOxygen > 0) {
+    // Oxygen ranges from 0% to 14% (14 steps)
+    penalty += req.minOxygen * 1.5;
+  }
+
+  // --- MAX requirements (ceiling constraints) ---
+  // These are especially punishing because the window CLOSES as the game progresses
+  // If you draw the card late, it may already be unplayable
+
+  if (req.maxTemperature !== undefined) {
+    // The lower the max, the smaller the window to play it
+    const stepsFromMax = (8 - req.maxTemperature) / 2;
+    if (stepsFromMax > 0) {
+      penalty += stepsFromMax * 1.5;
+    }
+  }
+
+  if (req.maxOxygen !== undefined) {
+    const stepsFromMax = 14 - req.maxOxygen;
+    if (stepsFromMax > 0) {
+      penalty += stepsFromMax * 1.5;
+    }
+  }
+
+  if (req.maxOceans !== undefined) {
+    const stepsFromMax = 9 - req.maxOceans;
+    if (stepsFromMax > 0) {
+      penalty += stepsFromMax * 2;
+    }
+  }
+
+  // --- Tag requirements ---
+  // Need specific tags = need specific strategy/cards already played
+  if (req.tag) {
+    penalty += req.tag.count * 3;
+  }
+
+  // --- Production requirements ---
+  if (req.minProduction) {
+    for (const [, amount] of Object.entries(req.minProduction)) {
+      if (amount !== undefined && amount > 0) {
+        penalty += amount * 3;
+      }
+    }
+  }
+
+  // Scale penalty slightly by how late in the game we are:
+  // Early game = requirements are more punishing (more uncertainty)
+  // Late game = you know if you can play it or not, less penalty
+  const gameProgressFactor = settings.generationsRemaining / settings.totalGenerations;
+  // Range: 0.6 (late game) to 1.0 (early game)
+  const timingMultiplier = 0.6 + 0.4 * gameProgressFactor;
+
+  return Math.round(penalty * timingMultiplier * 10) / 10;
+}
+
+/**
  * Calculate the generation at which a card breaks even
  */
 function calcBreakevenGeneration(
@@ -265,6 +365,7 @@ export function evaluateCard(
   const globalParameterValue = calcGlobalParameterValue(card, settings);
   const cardDiscountValue = calcCardDiscountValue(card, settings);
   const tagValue = calcTagValue(card);
+  const requirementPenalty = calcRequirementPenalty(card, settings);
 
   const totalValue =
     productionValue +
@@ -273,7 +374,8 @@ export function evaluateCard(
     vpValue +
     globalParameterValue +
     cardDiscountValue +
-    tagValue;
+    tagValue -
+    requirementPenalty;
 
   const costMC = card.cost;
   const netValue = totalValue - costMC;
@@ -293,6 +395,7 @@ export function evaluateCard(
       globalParameterValue: Math.round(globalParameterValue * 10) / 10,
       cardDiscountValue: Math.round(cardDiscountValue * 10) / 10,
       tagValue: Math.round(tagValue * 10) / 10,
+      requirementPenalty: Math.round(requirementPenalty * 10) / 10,
     },
     breakevenGeneration,
   };
