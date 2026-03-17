@@ -175,6 +175,7 @@ export default function Home() {
                     <p>8 calore = 1 temp = 1 TR</p>
                     <p>Acciaio = {settings.steelDiscount} MC</p>
                     <p>Titanio = {settings.titaniumDiscount} MC</p>
+                    <p>Temp: {settings.currentTemperature}°C | O2: {settings.currentOxygen}% | Oceani: {settings.currentOceans}/9</p>
                   </div>
                 </CardContent>
               </Card>

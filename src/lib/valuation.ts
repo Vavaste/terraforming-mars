@@ -1,4 +1,4 @@
-import { TerraformingMarsCard, GameSettings, CardValuation } from "./types";
+import { TerraformingMarsCard, GameSettings, CardValuation, isTemperatureMaxed, isOxygenMaxed, isOceansMaxed } from "./types";
 
 /**
  * Resource values in MC equivalents (per unit)
@@ -29,18 +29,18 @@ function getResourceValueMC(
       return settings.titaniumDiscount;
     case "plants":
       // 8 plants = 1 greenery = 1VP + (1 TR if oxygen available)
-      if (settings.oxygenAvailable) {
+      if (!isOxygenMaxed(settings)) {
         return (VP_VALUE_MC + TR_BASE_VP_VALUE) / 8; // ~3.25 MC
       }
       return VP_VALUE_MC / 8; // ~1.625 MC
     case "energy":
       // Energy converts to heat, and 8 heat = 1 temp = 1 TR
-      if (settings.temperatureAvailable) {
+      if (!isTemperatureMaxed(settings)) {
         return TR_BASE_VP_VALUE / 8; // ~1.625 MC
       }
       return 0.5; // minimal value if temp maxed
     case "heat":
-      if (settings.temperatureAvailable) {
+      if (!isTemperatureMaxed(settings)) {
         return TR_BASE_VP_VALUE / 8; // ~1.625 MC
       }
       return 0.5;
@@ -158,24 +158,24 @@ function calcGlobalParameterValue(
   let value = 0;
 
   // Temperature steps: each raises TR by 1 (if available)
-  if (card.effects.temperatureSteps && settings.temperatureAvailable) {
+  if (card.effects.temperatureSteps && !isTemperatureMaxed(settings)) {
     value += card.effects.temperatureSteps * (VP_VALUE_MC + settings.generationsRemaining);
   }
 
   // Oxygen steps: each raises TR by 1 (if available)
-  if (card.effects.oxygenSteps && settings.oxygenAvailable) {
+  if (card.effects.oxygenSteps && !isOxygenMaxed(settings)) {
     value += card.effects.oxygenSteps * (VP_VALUE_MC + settings.generationsRemaining);
   }
 
   // Ocean tiles: each raises TR by 1 + placement bonuses (~2 MC average)
-  if (card.effects.oceanTiles && settings.oceansAvailable) {
+  if (card.effects.oceanTiles && !isOceansMaxed(settings)) {
     value += card.effects.oceanTiles * (VP_VALUE_MC + settings.generationsRemaining + 2);
   }
 
   // Greenery tiles: 1 VP + oxygen step
   if (card.effects.greeneryTiles) {
     value += card.effects.greeneryTiles * VP_VALUE_MC; // VP from greenery
-    if (settings.oxygenAvailable) {
+    if (!isOxygenMaxed(settings)) {
       value += card.effects.greeneryTiles * (VP_VALUE_MC + settings.generationsRemaining); // TR from oxygen
     }
   }
@@ -236,51 +236,72 @@ function calcRequirementPenalty(
   let penalty = 0;
 
   // --- MIN requirements on global parameters ---
-  // The higher the minimum, the later you can play it = bigger penalty
+  // Penalty based on how far current state is from the requirement.
+  // If already met, no penalty. If far away, big penalty.
 
   if (req.minOceans !== undefined && req.minOceans > 0) {
-    // 9 oceans total. Each ocean required = ~2 MC penalty
-    // Scale: 1-2 oceans = mild, 3-4 = moderate, 5+ = severe
-    penalty += req.minOceans * 2;
+    const oceansNeeded = req.minOceans - settings.currentOceans;
+    if (oceansNeeded > 0) {
+      // Each ocean still needed = ~2.5 MC penalty
+      penalty += oceansNeeded * 2.5;
+    }
+    // Small base penalty even if met (was restrictive during draft)
+    else {
+      penalty += 0.5;
+    }
   }
 
   if (req.minTemperature !== undefined) {
-    // Temperature ranges from -30°C to +8°C in 2°C steps (19 steps)
-    // Convert to steps from minimum: (-30 is step 0, +8 is step 19)
-    const tempStepsFromMin = (req.minTemperature - (-30)) / 2;
-    if (tempStepsFromMin > 0) {
-      penalty += tempStepsFromMin * 1.2;
+    const stepsNeeded = (req.minTemperature - settings.currentTemperature) / 2;
+    if (stepsNeeded > 0) {
+      penalty += stepsNeeded * 1.5;
+    } else {
+      penalty += 0.5;
     }
   }
 
   if (req.minOxygen !== undefined && req.minOxygen > 0) {
-    // Oxygen ranges from 0% to 14% (14 steps)
-    penalty += req.minOxygen * 1.5;
+    const oxygenNeeded = req.minOxygen - settings.currentOxygen;
+    if (oxygenNeeded > 0) {
+      penalty += oxygenNeeded * 1.8;
+    } else {
+      penalty += 0.5;
+    }
   }
 
   // --- MAX requirements (ceiling constraints) ---
-  // These are especially punishing because the window CLOSES as the game progresses
-  // If you draw the card late, it may already be unplayable
+  // If already exceeded, the card is UNPLAYABLE = massive penalty
+  // If close to limit, moderate penalty (window closing)
 
   if (req.maxTemperature !== undefined) {
-    // The lower the max, the smaller the window to play it
-    const stepsFromMax = (8 - req.maxTemperature) / 2;
-    if (stepsFromMax > 0) {
-      penalty += stepsFromMax * 1.5;
+    if (settings.currentTemperature > req.maxTemperature) {
+      // Already past max - card is unplayable!
+      penalty += 50;
+    } else {
+      // How many steps of room left before window closes
+      const roomLeft = (req.maxTemperature - settings.currentTemperature) / 2;
+      const totalWindow = (8 - req.maxTemperature) / 2;
+      penalty += Math.max(0, (totalWindow - roomLeft) * 1.5 + 1);
     }
   }
 
   if (req.maxOxygen !== undefined) {
-    const stepsFromMax = 14 - req.maxOxygen;
-    if (stepsFromMax > 0) {
-      penalty += stepsFromMax * 1.5;
+    if (settings.currentOxygen > req.maxOxygen) {
+      penalty += 50;
+    } else {
+      const roomLeft = req.maxOxygen - settings.currentOxygen;
+      const totalWindow = 14 - req.maxOxygen;
+      penalty += Math.max(0, (totalWindow - roomLeft) * 1.5 + 1);
     }
   }
 
   if (req.maxOceans !== undefined) {
-    const stepsFromMax = 9 - req.maxOceans;
-    if (stepsFromMax > 0) {
-      penalty += stepsFromMax * 2;
+    if (settings.currentOceans > req.maxOceans) {
+      penalty += 50;
+    } else {
+      const roomLeft = req.maxOceans - settings.currentOceans;
+      const totalWindow = 9 - req.maxOceans;
+      penalty += Math.max(0, (totalWindow - roomLeft) * 2 + 1);
     }
   }
 

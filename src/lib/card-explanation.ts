@@ -1,4 +1,4 @@
-import { CardValuation, GameSettings } from "./types";
+import { CardValuation, GameSettings, isTemperatureMaxed, isOxygenMaxed, isOceansMaxed } from "./types";
 
 const resourceNames: Record<string, string> = {
   megacredits: "MC",
@@ -17,6 +17,10 @@ export function generateCardExplanation(valuation: CardValuation, settings: Game
   const { card, breakdown, breakevenGeneration } = valuation;
   const lines: string[] = [];
 
+  const oxygenAvailable = !isOxygenMaxed(settings);
+  const temperatureAvailable = !isTemperatureMaxed(settings);
+  const oceansAvailable = !isOceansMaxed(settings);
+
   // --- COST ---
   if (card.type === "prelude") {
     lines.push(`Questa carta Preludio e gratuita (0 MC) e si gioca prima dell'inizio della partita.`);
@@ -34,8 +38,8 @@ export function generateCardExplanation(valuation: CardValuation, settings: Game
       const mcPerUnit = res === "megacredits" ? 1 :
         res === "steel" ? settings.steelDiscount :
         res === "titanium" ? settings.titaniumDiscount :
-        res === "plants" ? (settings.oxygenAvailable ? 3.3 : 1.6) :
-        res === "energy" || res === "heat" ? (settings.temperatureAvailable ? 1.6 : 0.5) : 1;
+        res === "plants" ? (oxygenAvailable ? 3.3 : 1.6) :
+        res === "energy" || res === "heat" ? (temperatureAvailable ? 1.6 : 0.5) : 1;
 
       prodParts.push(
         `${sign}${amt} ${resName}/turno (${amt > 0 ? "" : ""}${amt} x ${mcPerUnit.toFixed(1)} MC x ${settings.generationsRemaining} gen = ${(amt * mcPerUnit * settings.generationsRemaining).toFixed(1)} MC)`
@@ -92,26 +96,26 @@ export function generateCardExplanation(valuation: CardValuation, settings: Game
   // --- GLOBAL PARAMETERS ---
   if (breakdown.globalParameterValue !== 0) {
     const globalParts: string[] = [];
-    if (card.effects.temperatureSteps && settings.temperatureAvailable) {
+    if (card.effects.temperatureSteps && temperatureAvailable) {
       globalParts.push(
         `+${card.effects.temperatureSteps} temp = +${card.effects.temperatureSteps} TR (${card.effects.temperatureSteps * (13 + settings.generationsRemaining)} MC)`
       );
     }
-    if (card.effects.oxygenSteps && settings.oxygenAvailable) {
+    if (card.effects.oxygenSteps && oxygenAvailable) {
       globalParts.push(
         `+${card.effects.oxygenSteps} ossigeno = +${card.effects.oxygenSteps} TR (${card.effects.oxygenSteps * (13 + settings.generationsRemaining)} MC)`
       );
     }
-    if (card.effects.oceanTiles && settings.oceansAvailable) {
+    if (card.effects.oceanTiles && oceansAvailable) {
       globalParts.push(
         `${card.effects.oceanTiles} oceano/i = +${card.effects.oceanTiles} TR + bonus piazzamento (~${card.effects.oceanTiles * 2} MC)`
       );
     }
     if (card.effects.greeneryTiles) {
       const gVal = card.effects.greeneryTiles * 13;
-      const gTR = settings.oxygenAvailable ? card.effects.greeneryTiles * (13 + settings.generationsRemaining) : 0;
+      const gTR = oxygenAvailable ? card.effects.greeneryTiles * (13 + settings.generationsRemaining) : 0;
       globalParts.push(
-        `${card.effects.greeneryTiles} foresta/e = ${card.effects.greeneryTiles} VP (${gVal} MC)${settings.oxygenAvailable ? ` + ${card.effects.greeneryTiles} TR da ossigeno (${gTR} MC)` : ""}`
+        `${card.effects.greeneryTiles} foresta/e = ${card.effects.greeneryTiles} VP (${gVal} MC)${oxygenAvailable ? ` + ${card.effects.greeneryTiles} TR da ossigeno (${gTR} MC)` : ""}`
       );
     }
     if (card.effects.cityTiles) {
@@ -145,25 +149,49 @@ export function generateCardExplanation(valuation: CardValuation, settings: Game
     const req = card.requirements;
     const penaltyParts: string[] = [];
     if (req.minOceans !== undefined && req.minOceans > 0) {
-      penaltyParts.push(`min ${req.minOceans} oceani (-${req.minOceans * 2} MC base)`);
+      const oceansNeeded = req.minOceans - settings.currentOceans;
+      if (oceansNeeded > 0) {
+        penaltyParts.push(`min ${req.minOceans} oceani (attuali: ${settings.currentOceans}, mancano ${oceansNeeded})`);
+      } else {
+        penaltyParts.push(`min ${req.minOceans} oceani (requisito soddisfatto, penalita residua minima)`);
+      }
     }
     if (req.minTemperature !== undefined) {
-      const steps = (req.minTemperature - (-30)) / 2;
-      if (steps > 0) {
-        penaltyParts.push(`temp >= ${req.minTemperature}°C (-${(steps * 1.2).toFixed(1)} MC base)`);
+      if (settings.currentTemperature < req.minTemperature) {
+        const stepsNeeded = (req.minTemperature - settings.currentTemperature) / 2;
+        penaltyParts.push(`temp >= ${req.minTemperature}°C (attuale: ${settings.currentTemperature}°C, mancano ${stepsNeeded} step)`);
+      } else {
+        penaltyParts.push(`temp >= ${req.minTemperature}°C (requisito soddisfatto)`);
       }
     }
     if (req.minOxygen !== undefined && req.minOxygen > 0) {
-      penaltyParts.push(`O2 >= ${req.minOxygen}% (-${(req.minOxygen * 1.5).toFixed(1)} MC base)`);
+      const oxygenNeeded = req.minOxygen - settings.currentOxygen;
+      if (oxygenNeeded > 0) {
+        penaltyParts.push(`O2 >= ${req.minOxygen}% (attuale: ${settings.currentOxygen}%, mancano ${oxygenNeeded}%)`);
+      } else {
+        penaltyParts.push(`O2 >= ${req.minOxygen}% (requisito soddisfatto)`);
+      }
     }
     if (req.maxTemperature !== undefined) {
-      penaltyParts.push(`temp <= ${req.maxTemperature}°C (finestra limitata)`);
+      if (settings.currentTemperature > req.maxTemperature) {
+        penaltyParts.push(`temp <= ${req.maxTemperature}°C (SUPERATO! Carta non giocabile)`);
+      } else {
+        penaltyParts.push(`temp <= ${req.maxTemperature}°C (attuale: ${settings.currentTemperature}°C, finestra ancora aperta)`);
+      }
     }
     if (req.maxOxygen !== undefined) {
-      penaltyParts.push(`O2 <= ${req.maxOxygen}% (finestra limitata)`);
+      if (settings.currentOxygen > req.maxOxygen) {
+        penaltyParts.push(`O2 <= ${req.maxOxygen}% (SUPERATO! Carta non giocabile)`);
+      } else {
+        penaltyParts.push(`O2 <= ${req.maxOxygen}% (attuale: ${settings.currentOxygen}%)`);
+      }
     }
     if (req.maxOceans !== undefined) {
-      penaltyParts.push(`oceani <= ${req.maxOceans} (finestra limitata)`);
+      if (settings.currentOceans > req.maxOceans) {
+        penaltyParts.push(`oceani <= ${req.maxOceans} (SUPERATO! Carta non giocabile)`);
+      } else {
+        penaltyParts.push(`oceani <= ${req.maxOceans} (attuali: ${settings.currentOceans})`);
+      }
     }
     if (req.tag) {
       penaltyParts.push(`richiede ${req.tag.count}x tag ${req.tag.tag} (-${req.tag.count * 3} MC)`);
@@ -180,7 +208,6 @@ export function generateCardExplanation(valuation: CardValuation, settings: Game
     for (const p of penaltyParts) {
       lines.push(`  ${p}`);
     }
-    lines.push(`  La penalita e ${settings.generationsRemaining >= settings.totalGenerations * 0.6 ? "piena (inizio partita, piu incertezza)" : "ridotta (fine partita, sai gia se puoi giocarla)"}.`);
   }
 
   // --- BREAKEVEN ---

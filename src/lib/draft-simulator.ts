@@ -3,6 +3,8 @@ import { evaluateCard } from "./valuation";
 
 const DRAFT_COST_PER_CARD = 3; // MC to keep each card
 const DRAFT_HAND_SIZE = 10;
+const PRELUDE_DRAW_SIZE = 4;
+const PRELUDE_KEEP_SIZE = 2;
 
 export interface DraftResult {
   drawnCards: TerraformingMarsCard[];
@@ -10,6 +12,20 @@ export interface DraftResult {
   allCombinations: DraftHand[];
   keepAll: DraftHand;
   keepNone: DraftHand;
+}
+
+export interface PreludeDraftResult {
+  drawnCards: TerraformingMarsCard[];
+  bestPick: PreludeHand;
+  allCombinations: PreludeHand[];
+}
+
+export interface PreludeHand {
+  kept: CardValuation[];
+  discarded: CardValuation[];
+  totalNetValue: number;
+  synergies: SynergyBonus[];
+  score: number;
 }
 
 export interface DraftHand {
@@ -27,13 +43,26 @@ export interface SynergyBonus {
 }
 
 /**
- * Draw N random cards from the pool
+ * Draw N random non-prelude cards from the pool
  */
 export function drawCards(
   allCards: TerraformingMarsCard[],
   count: number = DRAFT_HAND_SIZE
 ): TerraformingMarsCard[] {
-  const shuffled = [...allCards].sort(() => Math.random() - 0.5);
+  const nonPrelude = allCards.filter((c) => c.type !== "prelude");
+  const shuffled = [...nonPrelude].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
+
+/**
+ * Draw N random prelude cards from the pool
+ */
+export function drawPreludeCards(
+  allCards: TerraformingMarsCard[],
+  count: number = PRELUDE_DRAW_SIZE
+): TerraformingMarsCard[] {
+  const preludes = allCards.filter((c) => c.type === "prelude");
+  const shuffled = [...preludes].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, count);
 }
 
@@ -216,5 +245,60 @@ export function simulateDraft(
     allCombinations: allCombinations.slice(0, 20), // Top 20
     keepAll,
     keepNone,
+  };
+}
+
+/**
+ * Simulate a prelude draft: draw 4 prelude cards, pick the best 2.
+ * With 4 cards and picking 2, there are C(4,2) = 6 combinations.
+ */
+export function simulatePreludeDraft(
+  drawnCards: TerraformingMarsCard[],
+  settings: GameSettings
+): PreludeDraftResult {
+  const n = drawnCards.length;
+  const allCombinations: PreludeHand[] = [];
+
+  // Generate all combinations of exactly PRELUDE_KEEP_SIZE cards
+  const totalCombinations = 1 << n;
+  for (let mask = 0; mask < totalCombinations; mask++) {
+    const kept: TerraformingMarsCard[] = [];
+    const discarded: TerraformingMarsCard[] = [];
+
+    for (let i = 0; i < n; i++) {
+      if (mask & (1 << i)) {
+        kept.push(drawnCards[i]);
+      } else {
+        discarded.push(drawnCards[i]);
+      }
+    }
+
+    // Only consider combinations where we keep exactly 2
+    if (kept.length !== PRELUDE_KEEP_SIZE) continue;
+
+    const keptValuations = kept.map((c) => evaluateCard(c, settings));
+    const discardedValuations = discarded.map((c) => evaluateCard(c, settings));
+    const synergies = calcSynergies(kept, settings);
+    const synergyBonus = synergies.reduce((s, b) => s + b.bonus, 0);
+
+    // Prelude cards are free, so net value = sum of card values + synergy
+    const totalNetValue =
+      keptValuations.reduce((s, v) => s + v.netValue, 0) + synergyBonus;
+
+    allCombinations.push({
+      kept: keptValuations,
+      discarded: discardedValuations,
+      totalNetValue: Math.round(totalNetValue * 10) / 10,
+      synergies,
+      score: Math.round(totalNetValue * 10) / 10,
+    });
+  }
+
+  allCombinations.sort((a, b) => b.score - a.score);
+
+  return {
+    drawnCards,
+    bestPick: allCombinations[0],
+    allCombinations,
   };
 }

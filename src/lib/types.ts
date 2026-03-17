@@ -61,11 +61,22 @@ export interface TerraformingMarsCard {
 export interface GameSettings {
   generationsRemaining: number;
   totalGenerations: number;
-  oxygenAvailable: boolean; // can still raise oxygen
-  temperatureAvailable: boolean; // can still raise temperature
-  oceansAvailable: boolean; // oceans still placeable
+  currentTemperature: number; // -30 to +8 in 2°C steps
+  currentOxygen: number; // 0 to 14%
+  currentOceans: number; // 0 to 9
   steelDiscount: number; // MC value of steel (default 2)
   titaniumDiscount: number; // MC value of titanium (default 3)
+}
+
+/** Derived helpers for GameSettings */
+export function isTemperatureMaxed(s: GameSettings): boolean {
+  return s.currentTemperature >= 8;
+}
+export function isOxygenMaxed(s: GameSettings): boolean {
+  return s.currentOxygen >= 14;
+}
+export function isOceansMaxed(s: GameSettings): boolean {
+  return s.currentOceans >= 9;
 }
 
 export interface CardValuation {
@@ -90,9 +101,9 @@ export interface CardValuation {
 export const DEFAULT_GAME_SETTINGS: GameSettings = {
   generationsRemaining: 7,
   totalGenerations: 12,
-  oxygenAvailable: true,
-  temperatureAvailable: true,
-  oceansAvailable: true,
+  currentTemperature: -30,
+  currentOxygen: 0,
+  currentOceans: 0,
   steelDiscount: 2,
   titaniumDiscount: 3,
 };

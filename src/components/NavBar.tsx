@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/", label: "Carte" },
-  { href: "/draft", label: "Simulatore Pescata" },
+  { href: "/draft", label: "Pescata Iniziale" },
+  { href: "/draft/prelude", label: "Preludi" },
 ];
 
 export function NavBar() {
