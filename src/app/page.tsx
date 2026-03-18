@@ -14,6 +14,7 @@ import { CardValueBadge } from "@/components/CardValueBadge";
 import { TagBadge } from "@/components/TagBadge";
 import { CardTypeIcon } from "@/components/CardTypeIcon";
 import { NavBar } from "@/components/NavBar";
+import { TMCard } from "@/components/TMCard";
 
 type SortBy = "name" | "cost" | "value" | "rating";
 type FilterType = "all" | "event" | "automated" | "active" | "prelude";
@@ -265,13 +266,15 @@ export default function Home() {
             </div>
 
             {/* Card list */}
-            <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
               {filteredValuations.map((valuation) => (
-                <CardListItem
+                <TMCard
                   key={valuation.card.id}
+                  card={valuation.card}
                   valuation={valuation}
-                  isSelected={selectedCard?.id === valuation.card.id}
+                  selected={selectedCard?.id === valuation.card.id}
                   onClick={() => setSelectedCard(valuation.card)}
+                  compact
                 />
               ))}
             </div>
@@ -297,52 +300,3 @@ export default function Home() {
   );
 }
 
-function CardListItem({
-  valuation,
-  isSelected,
-  onClick,
-}: {
-  valuation: CardValuation;
-  isSelected: boolean;
-  onClick: () => void;
-}) {
-  const { card } = valuation;
-
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full text-left rounded-lg border p-3 transition-colors hover:bg-accent/50 ${
-        isSelected ? "border-amber-500 bg-amber-950/20" : "border-border"
-      }`}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-sm truncate">{card.name}</span>
-            <CardTypeIcon type={card.type} />
-          </div>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-amber-400 font-mono text-xs">{card.cost} MC</span>
-            <div className="flex gap-1">
-              {card.tags.map((tag, i) => (
-                <TagBadge key={i} tag={tag} />
-              ))}
-            </div>
-          </div>
-          {card.effects.production && (
-            <div className="flex gap-2 mt-1 text-xs text-muted-foreground">
-              {Object.entries(card.effects.production).map(([res, amt]) =>
-                amt !== 0 ? (
-                  <span key={res} className={`font-mono ${(amt ?? 0) > 0 ? "text-green-400" : "text-red-400"}`}>
-                    {(amt ?? 0) > 0 ? "+" : ""}{amt} {res.slice(0, 2).toUpperCase()}
-                  </span>
-                ) : null
-              )}
-            </div>
-          )}
-        </div>
-        <CardValueBadge rating={valuation.rating} netValue={valuation.netValue} />
-      </div>
-    </button>
-  );
-}

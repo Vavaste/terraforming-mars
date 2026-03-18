@@ -12,6 +12,7 @@ import { GameSettingsPanel } from "@/components/GameSettingsPanel";
 import { CardValueBadge } from "@/components/CardValueBadge";
 import { TagBadge } from "@/components/TagBadge";
 import { NavBar } from "@/components/NavBar";
+import { TMCard } from "@/components/TMCard";
 
 export default function PreludeDraftPage() {
   const [settings, setSettings] = useLocalStorage<GameSettings>("tm-settings", DEFAULT_GAME_SETTINGS);
@@ -115,7 +116,7 @@ export default function PreludeDraftPage() {
 
             {/* Drawn prelude cards */}
             {drawnCards && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {drawnCards.map((card) => {
                   const valuation = evaluateCard(card, settings);
                   const isSelected = selectedCards.has(card.id);
@@ -123,85 +124,15 @@ export default function PreludeDraftPage() {
                   const isNotRecommended = showRecommendation && !bestPickCardIds.has(card.id);
 
                   return (
-                    <button
+                    <TMCard
                       key={card.id}
+                      card={card}
+                      valuation={valuation}
+                      selected={isSelected}
+                      recommended={isBestPick && !isSelected}
+                      dimmed={isNotRecommended}
                       onClick={() => toggleCard(card.id)}
-                      className={`text-left rounded-lg border-2 p-5 transition-all ${
-                        isSelected
-                          ? "border-purple-500 bg-purple-950/30 ring-1 ring-purple-500/50"
-                          : "border-border hover:border-border/80"
-                      } ${isBestPick ? "ring-2 ring-green-500/60" : ""}
-                        ${isNotRecommended ? "opacity-50" : ""}`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs px-2 py-0.5 rounded bg-purple-800/40 text-purple-300 font-medium">
-                              Preludio
-                            </span>
-                            <span className="font-semibold">{card.name}</span>
-                          </div>
-                          <div className="flex gap-1.5 mt-2">
-                            {card.tags.map((tag, i) => (
-                              <TagBadge key={i} tag={tag} />
-                            ))}
-                          </div>
-
-                          {/* Production */}
-                          {card.effects.production && (
-                            <div className="flex gap-3 mt-3 text-sm">
-                              {Object.entries(card.effects.production).map(([res, amt]) =>
-                                amt !== 0 ? (
-                                  <span
-                                    key={res}
-                                    className={`font-mono ${(amt ?? 0) > 0 ? "text-green-400" : "text-red-400"}`}
-                                  >
-                                    {(amt ?? 0) > 0 ? "+" : ""}{amt} {res.slice(0, 2).toUpperCase()}/gen
-                                  </span>
-                                ) : null
-                              )}
-                            </div>
-                          )}
-
-                          {/* Immediate resources */}
-                          {card.effects.resources && (
-                            <div className="flex gap-3 mt-1 text-sm">
-                              {Object.entries(card.effects.resources).map(([res, amt]) =>
-                                amt !== 0 ? (
-                                  <span key={res} className="text-amber-400 font-mono">
-                                    +{amt} {res.slice(0, 2).toUpperCase()}
-                                  </span>
-                                ) : null
-                              )}
-                            </div>
-                          )}
-
-                          {/* Effects */}
-                          {card.effects.description && (
-                            <p className="text-xs text-muted-foreground mt-2 italic">
-                              {card.effects.description}
-                            </p>
-                          )}
-
-                          {/* TR */}
-                          {card.effects.tr !== undefined && card.effects.tr > 0 && (
-                            <span className="text-xs text-yellow-400 mt-1 inline-block">
-                              +{card.effects.tr} TR
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex flex-col items-end gap-1">
-                          <CardValueBadge rating={valuation.rating} netValue={valuation.netValue} />
-                          {isSelected && (
-                            <span className="text-xs text-purple-400 font-semibold">SELEZIONATO</span>
-                          )}
-                          {isBestPick && (
-                            <span className="text-xs text-green-400 font-semibold">CONSIGLIATO</span>
-                          )}
-                        </div>
-                      </div>
-                    </button>
+                    />
                   );
                 })}
               </div>

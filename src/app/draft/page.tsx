@@ -13,6 +13,7 @@ import { CardValueBadge } from "@/components/CardValueBadge";
 import { TagBadge } from "@/components/TagBadge";
 import { CardTypeIcon } from "@/components/CardTypeIcon";
 import { NavBar } from "@/components/NavBar";
+import { TMCard } from "@/components/TMCard";
 
 export default function DraftPage() {
   const [settings, setSettings] = useLocalStorage<GameSettings>("tm-settings", DEFAULT_GAME_SETTINGS);
@@ -114,7 +115,7 @@ export default function DraftPage() {
 
             {/* Drawn cards grid */}
             {drawnCards && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                 {drawnCards.map((card) => {
                   const valuation = evaluateCard(card, settings);
                   const isSelected = selectedCards.has(card.id);
@@ -122,84 +123,16 @@ export default function DraftPage() {
                   const isNotRecommended = showRecommendation && !bestHandCardIds.has(card.id);
 
                   return (
-                    <button
+                    <TMCard
                       key={card.id}
+                      card={card}
+                      valuation={valuation}
+                      selected={isSelected}
+                      recommended={isBestPick && !isSelected}
+                      dimmed={isNotRecommended}
                       onClick={() => toggleCard(card.id)}
-                      className={`text-left rounded-lg border-2 p-4 transition-all ${
-                        isSelected
-                          ? "border-amber-500 bg-amber-950/30 ring-1 ring-amber-500/50"
-                          : "border-border hover:border-border/80"
-                      } ${isBestPick ? "ring-2 ring-green-500/60" : ""}
-                        ${isNotRecommended ? "opacity-50" : ""}`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-sm">{card.name}</span>
-                            <CardTypeIcon type={card.type} />
-                          </div>
-                          <div className="flex items-center gap-2 mt-1.5">
-                            <span className="text-amber-400 font-mono text-sm font-bold">{card.cost} MC</span>
-                            <div className="flex gap-1">
-                              {card.tags.map((tag, i) => (
-                                <TagBadge key={i} tag={tag} />
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Production */}
-                          {card.effects.production && (
-                            <div className="flex gap-2 mt-1.5 text-xs">
-                              {Object.entries(card.effects.production).map(([res, amt]) =>
-                                amt !== 0 ? (
-                                  <span
-                                    key={res}
-                                    className={`font-mono ${(amt ?? 0) > 0 ? "text-green-400" : "text-red-400"}`}
-                                  >
-                                    {(amt ?? 0) > 0 ? "+" : ""}
-                                    {amt} {res.slice(0, 2).toUpperCase()}
-                                  </span>
-                                ) : null
-                              )}
-                            </div>
-                          )}
-
-                          {/* Effects */}
-                          {card.effects.description && (
-                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">
-                              {card.effects.description}
-                            </p>
-                          )}
-
-                          {/* VP */}
-                          {card.effects.vp !== undefined && card.effects.vp !== 0 && (
-                            <span className="text-xs text-yellow-400 mt-1 inline-block">
-                              {card.effects.vp} VP
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex flex-col items-end gap-1">
-                          <CardValueBadge rating={valuation.rating} netValue={valuation.netValue} />
-                          {isSelected && (
-                            <span className="text-xs text-amber-400 font-semibold">SELEZIONATA</span>
-                          )}
-                          {isBestPick && (
-                            <span className="text-xs text-green-400 font-semibold">CONSIGLIATA</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Breakeven info */}
-                      {valuation.breakevenGeneration !== null && (
-                        <div className="text-xs text-muted-foreground mt-2">
-                          Pareggio: gen {valuation.breakevenGeneration}
-                          {valuation.breakevenGeneration <= settings.generationsRemaining
-                            ? " (in tempo)"
-                            : " (troppo tardi!)"}
-                        </div>
-                      )}
-                    </button>
+                      compact
+                    />
                   );
                 })}
               </div>
